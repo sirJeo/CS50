@@ -84,40 +84,77 @@ int main(void)
     int points = 0;
 
     int diameter = 2 * RADIUS;
-    int xVel = 1;
+    int xVel = 0;
     int yVel = 2;
+    int paddleVel = 10;
 
     int pauseTime = 10;
     int pauseDec = 3;
+    double angleCoef = 1;
 
     GObject object = NULL;
 
     char *score[4];
+    waitForClick();
+
     // keep playing until game over
     while (lives > 0 && bricks > 0) {
         move(ball, xVel, yVel);
+
+        // listen for keypress events and react on it
+        GEvent event = getNextEvent(KEY_EVENT);
+        if (event != NULL && getEventType(event) == KEY_PRESSED) {
+            int keyCode = getKeyCode(event);
+            if (keyCode == LEFT_ARROW_KEY && getX(paddle) > 0) {
+                move(paddle, -paddleVel, 0);
+            } else if (keyCode == RIGHT_ARROW_KEY && getX(paddle) + getWidth(paddle) < WIDTH) {
+                move(paddle, paddleVel, 0);
+            }
+        }
         
+        // change horisontal direction when touch borders 
         if (getX(ball) + diameter >= WIDTH || getX(ball) <= 0) {
             xVel = -xVel;
         }
 
+        // change vertical direction when touch top border
         if (getY(ball) <= 0) {
             yVel = -yVel;
         }
 
+        // if you touched bottom - lost life. Reset Ball settings.
         if (getY(ball) + diameter >= HEIGHT) {
-            yVel = -yVel;
-
-            // lives --;
-            // pauseTime = 10;
+            lives --;
+            pauseTime = 10;
+            xVel = 0;
+            yVel = -2;
+            pauseDec = 3;
+            setLocation(ball, WIDTH / 2 - RADIUS, HEIGHT / 2 - RADIUS);
         }
 
         Collision collision = detectCollision(window, ball);
 
         if (collision.object != NULL) {
+            //When ball touched paddle
             if (paddle == collision.object) {
-                // bricks = 0;
+                int paddleX = getX(paddle);
+                int ballTouchX = getX(ball) + RADIUS;
+
+                if (paddleX < ballTouchX) {
+                    int touchPosition = (ballTouchX - paddleX) / RADIUS;
+                    xVel += -3 + touchPosition;
+                    xVel = -4 < xVel ? xVel : -4;
+                    xVel = 4 > xVel ? xVel : 4;
+                    yVel = (yVel < 0 ? -1 : 1) * (abs(xVel) > 2 ? 1 : 2);
+                    yVel = -yVel;
+                    if (abs(xVel) > 1) {
+                        angleCoef = 1 + 0.2 * (abs(xVel) - 1);
+                    }
+                }
+                // printf("Xvel: %i Yvel %i \n", xVel, yVel);
+
             } else if (strcmp(getType(collision.object), "GRect") == 0) {
+                // When ball touched bricks - remove it from the game.
                 setLocation(collision.object, -100, -100); 
                 removeOp(collision.object);
 
@@ -129,9 +166,11 @@ int main(void)
                     xVel = -xVel;
                 }
                 
+                // update score (depends on ball speed)
                 points += (abs(pauseTime - 10) + 1) * 1;
                 updateScoreboard(window, label, points);
 
+                // change spead by long time success
                 pauseDec--;
                 if (pauseDec <= 0) {
                     pauseDec = 3;
@@ -142,22 +181,23 @@ int main(void)
             }
         }
 
-        pause(pauseTime);
+        pause(pauseTime * angleCoef);
     }
 
+    char msg[40];
+
     if (lives == 0) {
+        sprintf(msg, "You Loose! Score: %i", points);
         setColor(label, "0x990000");
-        setLabel(label, "You Loose!");
-        centerLabel(window, label);
     }
     
     if (bricks == 0) {
-        char msg[40];
         sprintf(msg, "You Won this game. Your score is: %i", points);
         setColor(label, "0x009900");
-        setLabel(label, msg);
-        centerLabel(window, label);
     }
+
+    setLabel(label, msg);
+    centerLabel(window, label);
 
     // wait for click before exiting
     waitForClick();
@@ -304,9 +344,6 @@ Collision detectCollision(GWindow window, GOval ball)
         }
     }
 
-    if (object != NULL) {
-        printf("touch %s \n", getType(object));
-    }
     collision.object = object;
     
     return collision;
