@@ -15,58 +15,45 @@
 
 #include "dictionary.h"
 
-struct Letter {
+typedef struct LetterTree {
     bool word;
-    struct Letter* next;
-};
+    struct LetterTree* letter[N]; 
+} LetterTree;
 
-bool loadWord(char* word);
-int prepareChar(char character);
-
-struct Letter list[N] = {{}};
 unsigned int dictSize = 0;
-unsigned int memsize = sizeof(struct Letter) * N;
+
+LetterTree* root;
 
 /**
  * Returns true if word is in dictionary else false.
  */
 bool check(const char* word)
 {
-    printf("ceheck word %s\n", word);
+    // printf("ceheck word %s\n", word);
     int index;
     int len = strlen(word);
-    struct Letter * position = &list[0];
-
-    if (len == 0 || len >= LENGTH) {
-        printf("LEN error %i \n\n", len);
+    if (dictSize == 0) {
         return false;
     }
-
+    
+    LetterTree* node = root;
+    
     for (int i = 0; i < len; i++) {
-
         if (!isalpha(word[i]) && word[i] != 39) {
-            printf("Wrong symbol %c \n\n", word[i]);
             return false;
         }
         index = prepareChar(word[i]);
         if (index > N-1) {
-            printf("Wrong index %i: %i, %i  \n\n", i, index, word[i]);
             return false;
         }
-        if (!position[index].next) {
-            printf("There is no index %i: %i, %i  \n\n", i, index, word[i]);
+
+        if (node->letter[index] == NULL) {
             return false;
         } 
-
-        if (i < len - 1) {
-            position = &position[index].next[0];
-        } else {
-            printf("Word check %i  \n\n", position[index].word ? 1 : 0);
-            return position[index].word;
-        }
+        node = node->letter[index];
     }
 
-    return false;
+    return !!node->word;
 }
 
 /**
@@ -80,73 +67,39 @@ bool load(const char* dictionary)
         return false;
     }
 
-    char buf[LENGTH];
-    char* EOL = "\n";
-    int i = 0;
+    root = (LetterTree*)malloc(sizeof(LetterTree));
 
-    while (fgets(buf, sizeof(buf), file) != NULL && !feof(file)){
-        while (strncmp(&buf[i], &EOL[0], 1) != 0) {
-            i++;
-        }
-        buf[i++] = '\0';
-        
-        char * line = (char *) malloc(sizeof(char) * i);
-        strcpy(line, buf);
-        if (!loadWord(line)) {
-            printf("Wrong word %s \n\n", line);
-            // return true;
-        }
+    char letter;
+    int index;
+    LetterTree* node;
 
-        i = 0;
+    while((letter = getc(file)) != EOF) {
+        node = root;
+
+        while(letter != '\n' && letter != EOF) {
+
+            if (!isalpha(letter) && letter != 39) {
+                return false;
+            }
+            index = prepareChar(letter);
+            if (index > N-1) {
+                return false;
+            }
+
+            if (node->letter[index] == NULL) {
+                node->letter[index] = (LetterTree*)malloc(sizeof(LetterTree));
+            } 
+
+            node = node->letter[index];
+            letter = getc(file);
+        }
+        node->word = true;
+        dictSize++;
     }
 
     fclose(file);
     return true;
 }
-
-bool loadWord(char* word) {
-    int index;
-    int len = strlen(word);
-    struct Letter* position = &list[0];
-
-    if (len == 0 || len >= LENGTH) {
-        printf("Wrong Length %i '%s' \n\n", len, word);
-        return false;
-    }
-
-    for (int i = 0; i < len; i++) {
-        // printf("Iteration Position: %i \n\n", position);
-        if (!isalpha(word[i]) && word[i] != 39) {
-            printf("Wrong symbol %c \n\n", word[i]);
-            return false;
-        }
-        index = prepareChar(word[i]);
-        if (index > N-1) {
-            printf("Wrong index %i: %i, %i  \n\n", i, index, word[i]);
-            return false;
-        }
-        
-        if (!position[index].next) {
-            printf("NEW %i\n", index);
-            position[index].next = malloc(sizeof(struct Letter) * N);
-            memsize += sizeof(struct Letter) * N;
-        }
-
-        if (i < len - 1) {
-            // printf("\nshould be next %i \n", position[index].next);
-            position = &position[index].next[0];
-            // printf("check it now %i \n\n", position);
-        }
-    }
-
-    position[index].word = true;
-    dictSize++;
-    
-    printf("Words %i %s: %i \n\n", dictSize, word, memsize);
-
-    return true;
-}
-
 
 int prepareChar(char character) {
     return character == 39 ? 0 : (character > 96) ? character - 96 : character - 64;
@@ -164,24 +117,19 @@ unsigned int size(void)
  * Unloads dictionary from memory.  Returns true if successful else false.
  */
 
-void structFree(struct Letter * letter) 
+void treeFree(LetterTree * node) 
 {
     for (int i = 0; i < N; i++) {
-        if (letter[i].next) {
-            structFree(&letter[i].next[0]);
+        if (node->letter[i] != NULL) {
+            treeFree(node->letter[i]);
         }
     }
-
-    free(letter);
+    free(node);
 }
 
 bool unload(void)
 {
-    for (int i = 0; i < N; i++) {
-        if (list[i].next) {
-            structFree(&list[i].next[0]);
-        }
-    }
+    treeFree(root);
     return true;
 }
 

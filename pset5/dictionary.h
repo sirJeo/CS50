@@ -18,6 +18,8 @@
 
 #define N 27
 
+int prepareChar(char character);
+
 /**
  * Returns true if word is in dictionary else false.
  */
