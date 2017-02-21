@@ -133,6 +133,7 @@ bool unload(void)
     return true;
 }
 
+/*
 int main(int argc, char* argv[])
 {
     load("./dict.txt");
@@ -144,3 +145,4 @@ int main(int argc, char* argv[])
     }
     unload();
 }
+*/
